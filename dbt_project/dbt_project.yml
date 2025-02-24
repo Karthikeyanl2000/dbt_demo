@@ -1,4 +1,4 @@
-name: 'test_dbt_project'
+name: 'dbt_project'
 version: '1.0.0'
 config-version: 2
 
@@ -18,6 +18,6 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  test_dbt_project:
+  dbt_project:
     example:
       +materialized: view
