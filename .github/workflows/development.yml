@@ -1,34 +1,47 @@
-name: Development Deployment
+name: Development CI For dbt
 
 on:
   push:
     branches:
-      - develop  # Runs only on the 'develop' branch
+      - 'main'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    environment: development  # Uses the 'development' environment in GitHub
+    environment: development  
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set Up Environment Variables
+      - name: Echo Checkout Status
         run: |
-          echo "DB_URL=${{ secrets.DB_URL }}" >> $GITHUB_ENV
-          echo "API_KEY=${{ secrets.API_KEY }}" >> $GITHUB_ENV
+          echo "Repository checkout completed"
+          echo "Current directory: ${{ github.workspace }}"
+          echo "Git ref: ${{ github.ref }}"
 
-      - name: Install Dependencies
-        run: |
-          echo "Installing dependencies..."
-          # Example: Install any required dependencies
-          sudo apt-get update && sudo apt-get install -y some-package
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-      - name: Deploy to Development
+      - name: Install dbt
         run: |
-          echo "Deploying to Development Environment..."
-          echo "Using Database: $DB_URL"
-          echo "API Key: $API_KEY"
-          # Add deployment scripts here, e.g., running migrations, starting services
+          python -m pip install --upgrade pip
+          pip install dbt-core dbt-postgres 
+
+      - name: dbt Dependencies
+        run: dbt deps
+
+      - name: dbt Compile
+        run: dbt compile
+
+      - name: Run dbt Tests
+        run: dbt test
+
+      - name: Build dbt Models
+        run: dbt build --target development
+
+      - name: Generate dbt Docs
+        run: dbt docs generate
