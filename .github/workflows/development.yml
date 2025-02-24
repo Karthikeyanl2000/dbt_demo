@@ -39,10 +39,12 @@ jobs:
         run: |
           mkdir -p ~/.dbt
           echo "${{ secrets.PROFILES_YML }}" > ~/.dbt/profiles.yml
-          echo "profiles.yml configured for development"
+          cat ~/.dbt/profiles.yml  # Debugging step (remove in production)
+      
 
       - name: Validate profiles.yml
         run: cat ~/.dbt/profiles.yml  # Debugging step (Remove in production)
+        
 
       - name: Change to dbt Project Directory
         run: |
