@@ -20,6 +20,7 @@ jobs:
           echo "Repository checkout completed"
           echo "Current directory: ${{ github.workspace }}"
           echo "Git ref: ${{ github.ref }}"
+          ls -la  # List files to verify structure
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -43,17 +44,23 @@ jobs:
       - name: Validate profiles.yml
         run: cat ~/.dbt/profiles.yml  # Debugging step (Remove in production)
 
+      - name: Change to dbt Project Directory
+        run: |
+          cd dbt_project
+          echo "Current directory: $(pwd)"
+          ls -la  # List files to confirm dbt_project.yml exists
+
       - name: dbt Dependencies
-        run: dbt deps
+        run: cd dbt_project && dbt deps
 
       - name: dbt Compile
-        run: dbt compile
+        run: cd dbt_project && dbt compile
 
       - name: Run dbt Tests
-        run: dbt test
+        run: cd dbt_project && dbt test
 
       - name: Build dbt Models
-        run: dbt build --target development
+        run: cd dbt_project && dbt build --target development
 
       - name: Generate dbt Docs
-        run: dbt docs generate
+        run: cd dbt_project && dbt docs generate
