@@ -8,12 +8,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     environment: development  
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  
 
       - name: Echo Checkout Status
         run: |
@@ -39,12 +40,8 @@ jobs:
         run: |
           mkdir -p ~/.dbt
           echo "${{ secrets.PROFILES_YML }}" > ~/.dbt/profiles.yml
-          cat ~/.dbt/profiles.yml  # Debugging step (remove in production)
-      
-
-      - name: Validate profiles.yml
-        run: cat ~/.dbt/profiles.yml  # Debugging step (Remove in production)
-        
+          # Remove debugging step for production
+          # cat ~/.dbt/profiles.yml  
 
       - name: Change to dbt Project Directory
         run: |
@@ -62,7 +59,24 @@ jobs:
         run: cd dbt_project && dbt test
 
       - name: Build dbt Models
+        id: dbt_build
         run: cd dbt_project && dbt build --target development
-
-      - name: Generate dbt Docs
-        run: cd dbt_project && dbt docs generate
+        
+      - name: Merge to Feature Branch
+        if: success()  # Only run if all previous steps succeeded
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
+          
+          # Extract the branch name without 'refs/heads/' prefix
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Current branch is $BRANCH_NAME"
+          
+          # No need to merge to the same branch we're already on
+          # This step is included for clarity - in case you need to modify for a different workflow
+          echo "Build successful! Changes are already in the $BRANCH_NAME branch."
+          
+          # If you need to merge to a different branch, uncomment and modify below:
+          # git checkout target-branch
+          # git merge --no-ff $BRANCH_NAME -m "Auto-merge from successful CI build"
+          # git push origin target-branch
