@@ -39,33 +39,30 @@ jobs:
         run: |
           mkdir -p ~/.dbt
           echo "${{ secrets.PROFILES_YML }}" > ~/.dbt/profiles.yml
-          echo "profiles.yml configured for development"
           cat ~/.dbt/profiles.yml  # Debugging step (remove in production)
+      
 
-      - name: Validate dbt Project Structure
+      - name: Validate profiles.yml
+        run: cat ~/.dbt/profiles.yml  # Debugging step (Remove in production)
+        
+
+      - name: Change to dbt Project Directory
         run: |
-          ls -la dbt_project  # Check if dbt_project.yml is present
+          cd dbt_project
+          echo "Current directory: $(pwd)"
+          ls -la  # List files to confirm dbt_project.yml exists
 
-      - name: dbt-version
-        uses: mwhitaker/dbt-action@v1.6.3
-        with:
-          dbt_command: "dbt --version"
-          dbt_project_folder: "dbt_project"
+      - name: dbt Dependencies
+        run: cd dbt_project && dbt deps
 
-      - name: dbt-deps
-        uses: mwhitaker/dbt-action@v1.6.3
-        with:
-          dbt_command: "dbt deps"
-          dbt_project_folder: "dbt_project"
+      - name: dbt Compile
+        run: cd dbt_project && dbt compile
 
-      - name: dbt-run
-        uses: mwhitaker/dbt-action@v1.6.3
-        with:
-          dbt_command: "dbt run"
-          dbt_project_folder: "dbt_project"
+      - name: Run dbt Tests
+        run: cd dbt_project && dbt test
 
-      - name: dbt-test
-        uses: mwhitaker/dbt-action@v1.6.3
-        with:
-          dbt_command: "dbt test"
-          dbt_project_folder: "dbt_project"
+      - name: Build dbt Models
+        run: cd dbt_project && dbt build --target development
+
+      - name: Generate dbt Docs
+        run: cd dbt_project && dbt docs generate
