@@ -6,7 +6,7 @@ on:
       - 'feature/*' 
 
 jobs:
-  deploy:
+  development:
     runs-on: ubuntu-latest
     environment: development  
 
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Needed for proper merge operations
+          fetch-depth: 0  
 
       - name: Echo Checkout Status
         run: |
@@ -52,9 +52,6 @@ jobs:
       - name: dbt Dependencies
         run: cd dbt_project && dbt deps
 
-      # - name: dbt Compile
-      #   run: cd dbt_project && dbt compile
-
       # - name: Run dbt Tests
       #   run: cd dbt_project && dbt test
 
@@ -72,11 +69,27 @@ jobs:
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           echo "Current branch is $BRANCH_NAME"
           
-          # No need to merge to the same branch we're already on
-          # This step is included for clarity - in case you need to modify for a different workflow
           echo "Build successful! Changes are already in the $BRANCH_NAME branch."
-          
-          # If you need to merge to a different branch, uncomment and modify below:
-          # git checkout target-branch
-          # git merge --no-ff $BRANCH_NAME -m "Auto-merge from successful CI build"
-          # git push origin target-branch
+
+  docker-build:
+    needs: development  
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image
+        run: |
+          docker build -t my-dbt-app:latest .
+          docker tag my-dbt-app:latest ${{ secrets.DOCKER_USERNAME }}/my-dbt-app:latest
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-dbt-app:latest
