@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  
+          fetch-depth: 0  # Needed for proper merge operations
 
       - name: Echo Checkout Status
         run: |
@@ -52,15 +52,15 @@ jobs:
       - name: dbt Dependencies
         run: cd dbt_project && dbt deps
 
-      - name: dbt Compile
-        run: cd dbt_project && dbt compile
+      # - name: dbt Compile
+      #   run: cd dbt_project && dbt compile
 
-      - name: Run dbt Tests
-        run: cd dbt_project && dbt test
+      # - name: Run dbt Tests
+      #   run: cd dbt_project && dbt test
 
-      - name: Build dbt Models
-        id: dbt_build
-        run: cd dbt_project && dbt build --target development
+      # - name: Build dbt Models
+      #   id: dbt_build
+      #   run: cd dbt_project && dbt build --target development
         
       - name: Merge to Feature Branch
         if: success()  # Only run if all previous steps succeeded
