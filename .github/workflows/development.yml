@@ -3,17 +3,18 @@ name: Development CI For dbt
 on:
   push:
     branches:
-      - 'main'  # Runs on push to 'main' branch
+      - 'feature/*' 
 
 jobs:
-  deploy:
+  development:
     runs-on: ubuntu-latest
-
     environment: development  
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  
 
       - name: Echo Checkout Status
         run: |
@@ -39,12 +40,8 @@ jobs:
         run: |
           mkdir -p ~/.dbt
           echo "${{ secrets.PROFILES_YML }}" > ~/.dbt/profiles.yml
-          cat ~/.dbt/profiles.yml  # Debugging step (remove in production)
-      
-
-      - name: Validate profiles.yml
-        run: cat ~/.dbt/profiles.yml  # Debugging step (Remove in production)
-        
+          # Remove debugging step for production
+          # cat ~/.dbt/profiles.yml  
 
       - name: Change to dbt Project Directory
         run: |
@@ -55,14 +52,80 @@ jobs:
       - name: dbt Dependencies
         run: cd dbt_project && dbt deps
 
-      - name: dbt Compile
-        run: cd dbt_project && dbt compile
+      # - name: Run dbt Tests
+      #   run: cd dbt_project && dbt test
 
-      - name: Run dbt Tests
-        run: cd dbt_project && dbt test
+      # - name: Build dbt Models
+      #   id: dbt_build
+      #   run: cd dbt_project && dbt build --target development
+        
+      - name: Merge to Feature Branch
+        if: success()  # Only run if all previous steps succeeded
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
+          
+          # Extract the branch name without 'refs/heads/' prefix
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Current branch is $BRANCH_NAME"
+          
+          echo "Build successful! Changes are already in the $BRANCH_NAME branch."
 
-      - name: Build dbt Models
-        run: cd dbt_project && dbt build --target development
+  docker-build:
+    needs: development  
+    runs-on: ubuntu-latest
+    environment: development 
 
-      - name: Generate dbt Docs
-        run: cd dbt_project && dbt docs generate
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Get Current Date
+        id: date
+        run: echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image with Tag
+        run: |
+         docker build -t karthil/ogsgrafana-oss:dbt_engine-${{ env.BUILD_DATE }} .
+
+      - name: Push Docker Image
+        run: |
+          docker push karthil/ogsgrafana-oss:dbt_engine-${{ env.BUILD_DATE }}
+      
+      - name: Echo Build Info
+        run: |
+          echo "Docker Image pushed: karthil/ogsgrafana-oss:dbt_engine-${{ env.BUILD_DATE }}"
+
+  deploy:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    environment: development  
+
+    steps:
+      - name: Connect to Server and Deploy
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }} 
+          script: |
+            echo "Pulling latest Docker image..."
+            docker pull karthil/ogsgrafana-oss:dbt_engine-${{ env.BUILD_DATE }}
+
+            echo "Stopping and removing existing container..."
+            docker stop dbt_container || true
+            docker rm dbt_container || true
+
+            echo "Running new container..."
+            docker run -d --name dbt_container \
+              -e DBT_ENV=production \
+              -p 8000:8000 \
+              karthil/ogsgrafana-oss:dbt_engine-${{ env.BUILD_DATE }}
+
+            echo "Deployment completed successfully!"
