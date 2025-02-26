@@ -19,30 +19,41 @@ jobs:
           sudo apt-get install gh
           gh auth status || echo "GitHub CLI authentication needed"
 
-      - name: Check for Merge Conflicts
-        id: conflict_check
+      - name: Identify PR Author and Latest Commit Pusher
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         run: |
           PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
           PR_AUTHOR=$(gh pr view $PR_NUMBER --json author -q .author.login)
+          LATEST_COMMITTER=$(git log -1 --pretty=format:'%an')
+
+          echo "PR_AUTHOR=$PR_AUTHOR" >> $GITHUB_ENV
+          echo "LATEST_COMMITTER=$LATEST_COMMITTER" >> $GITHUB_ENV
+
+      - name: Check for Merge Conflicts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+        run: |
+          PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
           CONFLICTS=$(gh pr view $PR_NUMBER --json mergeable -q .mergeable)
-          
+
           if [[ "$CONFLICTS" == "CONFLICTING" ]]; then
             echo "❌ Merge conflicts detected!"
-            echo "PR_AUTHOR=$PR_AUTHOR" >> $GITHUB_ENV
+            echo "LATEST_COMMITTER=$LATEST_COMMITTER" >> $GITHUB_ENV
             exit 1
           else
             echo "✅ No merge conflicts detected."
           fi
 
-      - name: Notify PR Author to Resolve Conflicts
+      - name: Assign the Latest Committer to Resolve Conflicts
         if: failure()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         run: |
           PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
-          gh pr comment $PR_NUMBER --body "@${{ env.PR_AUTHOR }} Please resolve merge conflicts before merging into staging."
+          gh pr edit $PR_NUMBER --add-assignee "$LATEST_COMMITTER"
+          gh pr comment $PR_NUMBER --body "@${{ env.LATEST_COMMITTER }} Please resolve the merge conflicts before merging into staging."
+
 
   # docker-build-staging:
   #   needs: staging-test
